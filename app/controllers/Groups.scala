@@ -50,9 +50,7 @@ object Groups extends Controller {
     Ok(Json.toJson(group1))
   }
 
-  def search() = findGroups()
-
-  private def findGroups() = Action.async {
+  def findGroupsBlocking() = Action.async {
 
     val url = "http://localhost:9000/testgroup"
 
@@ -95,22 +93,7 @@ object Groups extends Controller {
     }
   }
 
-  def groupById(gid: String): Future[Group] = {
-
-    val url = s"http://localhost:9000/testgroup/${gid}"
-
-    WS.url(url).get().map {
-      response => {
-        val group = response.json
-        val groupResult: JsResult[Group] = group.validate[Group]
-        groupResult match {
-          case s: JsSuccess[Group] => s.get
-          case _ => Group("noid", "noname", None)
-        }
-      }
-    }
-  }
-
+  
   def allGroups : Future[Seq[Group]] = {
     
     val url = "http://localhost:9000/testgroup"
@@ -138,33 +121,14 @@ object Groups extends Controller {
     }
   }
 
+  // Here be blocking
   private def enrich(grps: Seq[Group]): Seq[Group] = {
     grps map (grp => Group(grp.id, grp.name, Some(Await.result(groupUsers(grp.id), 5 seconds))))
   }
 
 
-  // this works for a single call
-  def test1 = Action.async {
-    val resultFuture = for {
-      g <- groupById("123")
-      u <- groupUsers(g.id)
-    } yield (Group(g.id, g.name, Some(u)))
-
-    resultFuture map { response =>
-      Ok(Json.toJson(response))
-    } recover {
-      case NonFatal(t) =>
-        Ok(EMPTY_JSON)
-    }
-  }
-
-  private def enrichGroup(group: Group) = {
-    val usersFuture = groupUsers(group.id)
-
-    usersFuture map { users => users}
-  }
-
-  def test2 = Action.async {
+  // async version: no blocking
+  def findGroupsAsync = Action.async {
 
     // xs is a Future[Seq[Future[Group]]
     val xs = allGroups map { groups =>
